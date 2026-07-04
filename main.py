@@ -5,6 +5,7 @@ from langgraph.graph import StateGraph, START, END
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.messages import AIMessage
 from langgraph.checkpoint.memory import MemorySaver
 import os
 
@@ -17,6 +18,22 @@ llm = ChatGoogleGenerativeAI(
 
 memory = MemorySaver()
 
+router_prompt = ChatPromptTemplate.from_template("""
+You are a routing assistant.
+
+If the user is asking for a mathematical calculation,
+return only:
+
+calculator
+
+Otherwise return only:
+
+chatbot
+
+Question:
+{question}
+""")
+
 class State(TypedDict):
     messages: Annotated[list, add_messages]
     operation: str
@@ -28,6 +45,31 @@ def chatbot(state: State):
         "messages": [response]
     }
 
+
+def calculator(state: State):
+    return {
+        "messages": [
+            AIMessage(
+                content="Calculator was selected."
+            )
+        ]
+    }
+
+def router(state: State):
+
+    question = state["messages"][-1].content
+
+    prompt = router_prompt.invoke({
+        "question": question
+    })
+
+    response = llm.invoke(prompt)
+
+    decision = response.content.strip().lower()
+
+    return decision
+    
+
 graph_builder = StateGraph(State)
 
 graph_builder.add_node(
@@ -37,12 +79,22 @@ graph_builder.add_node(
 
 graph_builder.add_edge(
     START,
-    "chatbot",
+    router,
 )
 
 graph_builder.add_edge(
     "chatbot",
-    END,
+    END
+)
+
+graph_builder.add_edge(
+    "calculator",
+    END
+)
+
+graph_builder.add_node(
+    "calculator",
+    calculator
 )
 
 graph = graph_builder.compile(
