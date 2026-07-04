@@ -19,6 +19,7 @@ memory = MemorySaver()
 
 class State(TypedDict):
     messages: Annotated[list, add_messages]
+    operation: str
 
 def chatbot(state: State):
     response = llm.invoke(state["messages"])
@@ -54,18 +55,18 @@ config = {
     }
 }
 
-result = graph.invoke({
-    "messages": [
-        HumanMessage(content="Hello i'm Nithwin!")
-    ]
-},
-config=config,)
+while True:
+    question = input("User >> ")
 
-result = graph.invoke({
-    "messages": [
-        HumanMessage(content="What is my name?")
-    ]
-},
-config=config,)
+    if question in ["quit", "exit"]:
+        print("Thanks for using my chatbot")
+        break
 
-print(result)
+    result = graph.invoke({
+        "messages": [
+            HumanMessage(content=question)
+        ]
+    },
+    config=config,)
+
+    print(f"AI >> {result["messages"][-1].content}")
